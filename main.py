@@ -94,7 +94,7 @@ def get_password(update: Update, context: Context):
 def send_connection_error_msg(update: Update, context: Context):
     context.bot.send_message(
         chat_id=update.effective_chat.id,
-        text="ارتباط با سرور دچار خطا شده است. لطفا ربات را با دستور /cancel خاموش و دوباره روشن کنید."
+        text="ارتباط با سرور دچار خطا شده است. لطفا ربات را دوباره با دستور /start روشن کنید."
     )
     return states.END
 
@@ -179,15 +179,16 @@ def get_q(update: Update, context: Context):
             reply_markup = keyboards.score(q_id)
         )
     elif patterns.is_img(fileName):
+        logger.warning("sending photo: " + link)
         context.bot.send_photo(
             chat_id = update.effective_chat.id,
             photo = link,
-            reply_markup = keyboards.score(fileName)
+            reply_markup = keyboards.score(q_id)
         )
     else:
         query.edit_message_text(
             text = link,
-            reply_markup = keyboards.score(fileName)
+            reply_markup = keyboards.score(q_id)
         )
 
     return states.SCORE_Q
@@ -212,13 +213,17 @@ def score(update: Update, context: Context):
         headers= {'Authorization' : 'Bearer ' + context.user_data['token'], 'Content-Type': 'application/json'},
         json = {"mark": result}
     )
+    logger.warning("Mark: " + str(r.status_code) +"\tdata: " + str(r.json()))
     code = r.status_code
     if code == 401:
         return handle_expired_token(update, context, score)
     if code != 200:
         return send_connection_error_msg(update, context)
 
-    query.edit_message_text("نمره با موفقیت ثبت شد.")
+    context.bot.send_message(
+        chat_id = update.effective_chat.id,
+        text = "نمره با موفقیت ثبت شد."
+    )
     context.bot.send_message(
         chat_id = update.effective_chat.id,
         text = """

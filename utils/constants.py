@@ -1,3 +1,3 @@
-BOT_TOKEN = "<BOT-TOKEN>"
+BOT_TOKEN = "TOKEN"
 
 SERVER_URL = "https://game.rastaiha.ir/"
