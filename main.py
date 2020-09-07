@@ -125,7 +125,7 @@ def get_field(update: Update, context: Context):
         
     token = context.user_data["token"]
     r = requests.get(
-        url= f"https://game.rastaiha.ir/api/institute/answers/{query.data}",
+        url= "https://game.rastaiha.ir/api/institute/answers/%s" % query.data,
         headers= {'Authorization' : 'Bearer ' + token, 'Content-Type': 'application/json'}
     )
     code = r.status_code
@@ -134,7 +134,7 @@ def get_field(update: Update, context: Context):
     if code!= 200:
         return send_connection_error_msg(update, context)
 
-    query.edit_message_text(text= f"{len(r.json())} پاسخ در انتظار تصحیح")
+    query.edit_message_text(text= "%d پاسخ در انتظار تصحیح"%len(r.json()))
     if len(r.json()) == 0:
         context.bot.send_message(
             chat_id = update.effective_chat.id,
