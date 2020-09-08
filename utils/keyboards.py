@@ -30,14 +30,18 @@ def countinue_keyboard():
 
 
 def answer_list(answers, max_row = 5):
-    return InlineKeyboardMarkup([[InlineKeyboardButton(
-            q["question"]["fileName"],
-            callback_data=q["id"]
-        )] for q in answers[:((max_row + 1) if len(answers) > max_row else len(answers))]])
+    __keyboard = [[InlineKeyboardButton(
+        q["question"]["fileName"],
+        callback_data=q["id"]
+    )] for q in answers[:((max_row + 1) if len(answers) > max_row else len(answers))]] + [[InlineKeyboardButton("بازگشت", callback_data="continue")]]
+    return InlineKeyboardMarkup(__keyboard)
 
 
 def score(answer_id):
     return InlineKeyboardMarkup([[
         InlineKeyboardButton("✅", callback_data="1 " + answer_id),
         InlineKeyboardButton("❌", callback_data="0 " + answer_id)
+    ],
+    [
+        InlineKeyboardButton("🔙", callback_data="continue")
     ]])

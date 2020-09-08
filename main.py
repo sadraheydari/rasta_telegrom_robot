@@ -20,6 +20,22 @@ logging.basicConfig(format='%(asctime)s - %(name)s - %(levelname)s - %(message)s
 logger = logging.getLogger(__name__)
 
 
+def handle_exeption(func):
+    def hfunc(update, context, *args, **kwargs):
+        try:
+            return func(update, context, *args, **kwargs)
+        except Exception as e:
+            context.bot.send_message(
+                chat_id=update.effective_chat.id,
+                text="Something went wrong!😔 \n Restart the bot using /start command."
+            )
+            logger.error(str(Exception.with_traceback(e)))
+            return states.END
+    hfunc.__name__ = func.__name__
+    return hfunc
+
+
+@handle_exeption
 def start(update: Update, context: Context):
     update.message.reply_text(
         """سلام! به ربات نمره ‌دهی رستا خوش‌آمدید...
@@ -31,28 +47,8 @@ def start(update: Update, context: Context):
     return states.LOGIN
 
 
-def login(update: Update, context: Context):
-    query = update.callback_query
-    query.edit_message_text(text= "Loging in...")
-    context.bot.send_message(
-        chat_id=update.effective_chat.id,
-        text="Username:"
-    )
-    return states.GET_USERNAME
-
-
-def get_username(update: Update, context: Context):
-    username = update.message.text
-    context.user_data['username'] = username
-    context.bot.send_message(
-        chat_id=update.effective_chat.id,
-        text="Password:"
-    )
-    return states.GET_PASSWORD
-
-
-def get_password(update: Update, context: Context):
-    context.user_data['password'] = update.message.text.lower()
+@handle_exeption
+def login_to_server(update: Update, context: Context):
     context.bot.send_message(
         chat_id=update.effective_chat.id,
         text="Connecting to server..."
@@ -64,12 +60,11 @@ def get_password(update: Update, context: Context):
     )
     code = r.status_code
     if code == 200:
+        context.user_data['token'] = r.json()['token']
         context.bot.send_message(
             chat_id=update.effective_chat.id,
             text="Connected successfully."
         )
-        context.user_data['token'] = r.json()['token']
-                
         update.message.reply_text(
             """
             کدوم کارگاه؟
@@ -91,6 +86,35 @@ def get_password(update: Update, context: Context):
         return states.END
 
 
+@handle_exeption
+def login(update: Update, context: Context):
+    query = update.callback_query
+    query.edit_message_text(text= "Loging in...")
+    context.bot.send_message(
+        chat_id=update.effective_chat.id,
+        text="Username:"
+    )
+    return states.GET_USERNAME
+
+
+@handle_exeption
+def get_username(update: Update, context: Context):
+    username = update.message.text
+    context.user_data['username'] = username
+    context.bot.send_message(
+        chat_id=update.effective_chat.id,
+        text="Password:"
+    )
+    return states.GET_PASSWORD
+
+
+@handle_exeption
+def get_password(update: Update, context: Context):
+    context.user_data['password'] = update.message.text.lower()
+    return login_to_server(update, context)
+    
+
+@handle_exeption
 def send_connection_error_msg(update: Update, context: Context):
     context.bot.send_message(
         chat_id=update.effective_chat.id,
@@ -99,6 +123,7 @@ def send_connection_error_msg(update: Update, context: Context):
     return states.END
 
 
+@handle_exeption
 def handle_expired_token(update: Update, context: Context, func):
     username, password = context.user_data['username'], context.user_data['password']
     r = requests.post(
@@ -112,6 +137,7 @@ def handle_expired_token(update: Update, context: Context, func):
     return func(update, context)
 
 
+@handle_exeption
 def get_field(update: Update, context: Context):
     query = update.callback_query
     query.answer()
@@ -125,7 +151,7 @@ def get_field(update: Update, context: Context):
         
     token = context.user_data["token"]
     r = requests.get(
-        url= "https://game.rastaiha.ir/api/institute/answers/%s" % query.data,
+        url= f"https://game.rastaiha.ir/api/institute/answers/{query.data}",
         headers= {'Authorization' : 'Bearer ' + token, 'Content-Type': 'application/json'}
     )
     code = r.status_code
@@ -134,27 +160,38 @@ def get_field(update: Update, context: Context):
     if code!= 200:
         return send_connection_error_msg(update, context)
 
-    query.edit_message_text(text= "%d پاسخ در انتظار تصحیح"%len(r.json()))
+    msg = f"{len(r.json())} پاسخ در انتظار تصحیح"
+    msg = msg + "\n" + constants.FIELD_NAME[query.data]
     if len(r.json()) == 0:
-        context.bot.send_message(
-            chat_id = update.effective_chat.id,
-            text = "ادامه",
+        query.edit_message_text(
+            text = msg,
             reply_markup = keyboards.countinue_keyboard()
         )
         return states.SCORE_Q
     
-    context.bot.send_message(
-        chat_id=update.effective_chat.id,
-        text="لیست پاسخ‌ها",
+    query.edit_message_text(
+        text=msg + "\n" + "لیست پاسخ‌ها",
         reply_markup= keyboards.answer_list(r.json())
     )
     return states.SELECT_Q
 
 
+@handle_exeption
 def get_q(update: Update, context: Context):
     query = update.callback_query
     query.answer()
     q_id = query.data
+
+    if query.data == "continue":
+        query.edit_message_text(
+            text = """
+            کدوم کارگاه؟
+            """,
+            reply_markup=keyboards.field_selection()
+        )
+        return states.SELECT_FIELD
+
+
     token = context.user_data['token']
     r = requests.get(
         url = constants.SERVER_URL + "api/institute/" + q_id,
@@ -169,31 +206,14 @@ def get_q(update: Update, context: Context):
     link = constants.SERVER_URL + "file/download/answer/" + fileName
     
     query.edit_message_text(
-        text = link
+        text = link,
+        reply_markup = keyboards.score(q_id)
     )
-    
-    if patterns.is_pdf(fileName):
-        context.bot.send_document(
-            chat_id = update.effective_chat.id,
-            document = link,
-            reply_markup = keyboards.score(q_id)
-        )
-    elif patterns.is_img(fileName):
-        logger.warning("sending photo: " + link)
-        context.bot.send_photo(
-            chat_id = update.effective_chat.id,
-            photo = link,
-            reply_markup = keyboards.score(q_id)
-        )
-    else:
-        query.edit_message_text(
-            text = link,
-            reply_markup = keyboards.score(q_id)
-        )
 
     return states.SCORE_Q
 
 
+@handle_exeption
 def score(update: Update, context: Context):
     query = update.callback_query
     query.answer()
@@ -207,7 +227,7 @@ def score(update: Update, context: Context):
         )
         return states.SELECT_FIELD
     
-    result, q_id = bool(query.data[0]), query.data[2:]
+    result, q_id = bool(int(query.data[0])), query.data[2:]
     r = requests.post(
         url= constants.SERVER_URL + "api/institute/mark/" + q_id,
         headers= {'Authorization' : 'Bearer ' + context.user_data['token'], 'Content-Type': 'application/json'},
@@ -220,20 +240,17 @@ def score(update: Update, context: Context):
     if code != 200:
         return send_connection_error_msg(update, context)
 
-    context.bot.send_message(
-        chat_id = update.effective_chat.id,
-        text = "نمره با موفقیت ثبت شد."
-    )
-    context.bot.send_message(
-        chat_id = update.effective_chat.id,
+    query.edit_message_text(
         text = """
-        کدوم کارگاه؟
+        نمره با موفقیت ثبت شد.
+        کارگاه بعدی؟
         """,
         reply_markup=keyboards.field_selection()
     )
     return states.SELECT_FIELD
 
 
+@handle_exeption
 def cancel(update: Update, context: Context):
     context.bot.send_message(
         chat_id = update.effective_chat.id,
