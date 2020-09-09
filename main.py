@@ -4,6 +4,7 @@ import logging
 import json
 import requests
 import re
+import sys
 
 from telegram.update import Update
 from telegram.ext.callbackcontext import CallbackContext as Context
@@ -15,21 +16,23 @@ from telegram.ext import (
 
 
 # Enable logging
-logging.basicConfig(format='%(asctime)s - %(name)s - %(levelname)s - %(message)s',
+logging.basicConfig(format='%(asctime)s - %(levelname)s - %(message)s',
                     level=logging.INFO)
 logger = logging.getLogger(__name__)
 
 
 def handle_exeption(func):
-    def hfunc(update, context, *args, **kwargs):
+    def hfunc(update: Update, context: Context, *args, **kwargs):
         try:
             return func(update, context, *args, **kwargs)
         except Exception as e:
+            _, exc_value, _ = sys.exc_info()
             context.bot.send_message(
                 chat_id=update.effective_chat.id,
-                text="Something went wrong!😔 \n Restart the bot using /start command."
+                text="Something went wrong!😔 \n Restart the bot using /start command.\n\n\n Info: " + str(exc_value)
             )
-            logger.error(str(Exception.with_traceback(e)))
+            logger.error(str(update.effective_user))
+            logger.exception(e)
             return states.END
     hfunc.__name__ = func.__name__
     return hfunc
@@ -88,6 +91,7 @@ def login_to_server(update: Update, context: Context):
 
 @handle_exeption
 def login(update: Update, context: Context):
+    raise Exception("exeption handling test")
     query = update.callback_query
     query.edit_message_text(text= "Loging in...")
     context.bot.send_message(
