@@ -68,6 +68,7 @@ def login_to_server(update: Update, context: Context):
             chat_id=update.effective_chat.id,
             text="Connected successfully."
         )
+        logger.info(update.effective_user.username + " logged in. username: " + username)
         update.message.reply_text(
             """
             کدوم کارگاه؟
@@ -91,7 +92,6 @@ def login_to_server(update: Update, context: Context):
 
 @handle_exeption
 def login(update: Update, context: Context):
-    raise Exception("exeption handling test")
     query = update.callback_query
     query.edit_message_text(text= "Loging in...")
     context.bot.send_message(
@@ -237,7 +237,7 @@ def score(update: Update, context: Context):
         headers= {'Authorization' : 'Bearer ' + context.user_data['token'], 'Content-Type': 'application/json'},
         json = {"mark": result}
     )
-    logger.warning("Mark: " + str(r.status_code) +"\tdata: " + str(r.json()))
+    logger.info("Mark: " + str(r.status_code) +"data: " + str(r.json()))
     code = r.status_code
     if code == 401:
         return handle_expired_token(update, context, score)
@@ -306,3 +306,4 @@ def main():
 
 if __name__ == "__main__":
     main()
+
